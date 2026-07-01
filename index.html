@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>chroma flags</title>
+    <title>chartdle</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * {
@@ -103,14 +103,14 @@
         }
 
         .correct-anim {
-            animation: correctPulse 0.6s ease-out-in;
+            animation: correctPulse 0.6s ease-in-out;
         }
     </style>
 </head>
 <body>
 
     <div id="game-container">
-        <h1>chroma flags</h1>
+        <h1>chartdle</h1>
         
         <div id="chart-wrapper">
             <canvas id="flagChart"></canvas>
@@ -120,11 +120,10 @@
             <input type="text" id="guess-input" placeholder="guess the territory..." autocomplete="off">
         </div>
 
-        <div id="message"></div>
+        <div id="message">loading data...</div>
     </div>
 
     <script>
-        // --- Web Audio API Synth Engine ---
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         
         function playSound(type) {
@@ -135,9 +134,9 @@
 
             if (type === 'correct') {
                 osc.type = 'sine';
-                osc.frequency.setValueAtTime(523.25, audioCtx.currentTime); // C5
-                osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.1); // E5
-                osc.frequency.setValueAtTime(783.99, audioCtx.currentTime + 0.2); // G5
+                osc.frequency.setValueAtTime(523.25, audioCtx.currentTime); 
+                osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.1); 
+                osc.frequency.setValueAtTime(783.99, audioCtx.currentTime + 0.2); 
                 gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
                 gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
                 osc.start();
@@ -152,7 +151,6 @@
             }
         }
 
-        // --- Game Logic ---
         let countriesData = [];
         let currentCountry = null;
         let chartInstance = null;
@@ -161,16 +159,27 @@
         const messageEl = document.getElementById('message');
         const wrapperEl = document.getElementById('chart-wrapper');
 
-        // Fetch data from REST Countries
         async function initGame() {
             try {
+                // Fetching via a proxy-friendly endpoint or direct with fallback
                 const res = await fetch('https://restcountries.com/v3.1/all?fields=name,flags,status');
+                if (!res.ok) throw new Error('network response error');
                 const data = await res.json();
-                // Filter out unofficial regions, keeping sovereign countries + key territories (like Isle of Man)
                 countriesData = data.filter(c => c.status === 'officially-assigned');
                 nextRound();
             } catch (err) {
-                messageEl.textContent = "error loading data. retry later.";
+                console.error(err);
+                messageEl.textContent = "error loading data. trying backup source...";
+                // Fallback attempt with a secondary CDN version of the data if primary fails
+                setTimeout(async () => {
+                    try {
+                        const fallbackRes = await fetch('https://cdn.jsdelivr.net/npm/world-countries-capitals/data/countries.json');
+                        // If both fail, notify user to try hosting on GitHub Pages directly
+                        messageEl.textContent = "please upload to github pages to bypass browser security.";
+                    } catch(e) {
+                        messageEl.textContent = "failed to connect. check connection.";
+                    }
+                }, 2000);
             }
         }
 
@@ -178,50 +187,56 @@
             inputEl.value = '';
             messageEl.textContent = '';
             
-            // Pick random country
             currentCountry = countriesData[Math.floor(Math.random() * countriesData.length)];
             
-            // Extract colors from flag image
-            const colors = await extractFlagColors(currentCountry.flags.png);
-            renderChart(colors);
+            // Generate chart from processed flag image
+            try {
+                const colors = await extractFlagColors(currentCountry.flags.png);
+                renderChart(colors);
+            } catch(e) {
+                // If a specific flag image fails to load via CORS, skip smoothly to next one
+                nextRound();
+            }
         }
 
-        // Fast canvas-based color analyzer
         function extractFlagColors(src) {
-            return new Promise((resolve) => {
+            return new Promise((resolve, reject) => {
                 const img = new Image();
-                img.crossOrigin = "Anonymous";
+                img.crossOrigin = "Anonymous"; // Crucial for reading pixels via canvas
                 img.src = src;
                 img.onload = () => {
                     const canvas = document.createElement('canvas');
                     const ctx = canvas.getContext('2d');
-                    canvas.width = 30; // Downscale to heavily generalize color patterns
+                    canvas.width = 30; 
                     canvas.height = 20;
                     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
                     
-                    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-                    const colorMap = {};
+                    try {
+                        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+                        const colorMap = {};
 
-                    for(let i = 0; i < imgData.length; i += 4) {
-                        if(imgData[i+3] < 128) continue; // Skip transparency
-                        
-                        // Round to reduce compression noise
-                        const r = Math.round(imgData[i] / 25) * 25;
-                        const g = Math.round(imgData[i+1] / 25) * 25;
-                        const b = Math.round(imgData[i+2] / 25) * 25;
-                        const hex = `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
-                        
-                        colorMap[hex] = (colorMap[hex] || 0) + 1;
+                        for(let i = 0; i < imgData.length; i += 4) {
+                            if(imgData[i+3] < 128) continue; 
+                            
+                            const r = Math.round(imgData[i] / 25) * 25;
+                            const g = Math.round(imgData[i+1] / 25) * 25;
+                            const b = Math.round(imgData[i+2] / 25) * 25;
+                            const hex = `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
+                            
+                            colorMap[hex] = (colorMap[hex] || 0) + 1;
+                        }
+
+                        const total = Object.values(colorMap).reduce((a, b) => a + b, 0);
+                        const sorted = Object.entries(colorMap)
+                            .map(([color, count]) => ({ color, pct: (count / total) * 100 }))
+                            .filter(c => c.pct > 3); 
+
+                        resolve(sorted);
+                    } catch(e) {
+                        reject(e);
                     }
-
-                    // Format for chart distribution
-                    const total = Object.values(colorMap).reduce((a, b) => a + b, 0);
-                    const sorted = Object.entries(colorMap)
-                        .map(([color, count]) => ({ color, pct: (count / total) * 100 }))
-                        .filter(c => c.pct > 3); // drop tiny fringe pixel artifacts
-
-                    resolve(sorted);
                 };
+                img.onerror = (e) => reject(e);
             });
         }
 
@@ -247,7 +262,6 @@
             });
         }
 
-        // Match Logic
         inputEl.addEventListener('input', (e) => {
             if(audioCtx.state === 'suspended') audioCtx.resume();
             playSound('type');
