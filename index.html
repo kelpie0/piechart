@@ -1,288 +1,160 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>chartdle</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: 'DM Sans', sans-serif;
+<script>
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    
+    function playSound(type) {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        if (type === 'correct') {
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(523.25, audioCtx.currentTime); 
+            osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.1); 
+            osc.frequency.setValueAtTime(783.99, audioCtx.currentTime + 0.2); 
+            gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.4);
+        } else if (type === 'type') {
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.05);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.05);
         }
+    }
 
-        body {
-            background: #0b0c10;
-            color: #c5c6c7;
-            text-transform: lowercase;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            overflow: hidden;
-        }
+    let countriesData = [];
+    let currentCountry = null;
+    let chartInstance = null;
 
-        #game-container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            max-width: 400px;
-            width: 90%;
-            text-align: center;
-            animation: fadeIn 0.8s ease-out;
-        }
+    const inputEl = document.getElementById('guess-input');
+    const messageEl = document.getElementById('message');
+    const wrapperEl = document.getElementById('chart-wrapper');
 
-        h1 {
-            font-weight: 300;
-            letter-spacing: -1px;
-            margin-bottom: 2rem;
-            color: #66fcf1;
-            text-shadow: 0 0 10px rgba(102, 252, 241, 0.3);
-        }
-
-        #chart-wrapper {
-            position: relative;
-            width: 250px;
-            height: 250px;
-            margin-bottom: 2.5rem;
-            transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.05));
-        }
-
-        #chart-wrapper:hover {
-            transform: scale(1.03);
-        }
-
-        #input-container {
-            width: 100%;
-            position: relative;
-        }
-
-        input[type="text"] {
-            width: 100%;
-            padding: 12px 20px;
-            background: #1f2833;
-            border: 1px solid #45f3ff33;
-            border-radius: 30px;
-            color: #fff;
-            font-size: 1rem;
-            outline: none;
-            text-align: center;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-        }
-
-        input[type="text"]:focus {
-            border-color: #66fcf1;
-            box-shadow: 0 0 15px rgba(102, 252, 241, 0.3);
-        }
-
-        #message {
-            margin-top: 1.5rem;
-            font-size: 0.9rem;
-            height: 20px;
-            color: #45f3ff;
-            letter-spacing: 0.5px;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        @keyframes correctPulse {
-            0% { transform: scale(1); filter: drop-shadow(0 0 20px rgba(46, 204, 113, 0.6)); }
-            50% { transform: scale(1.08); filter: drop-shadow(0 0 35px rgba(46, 204, 113, 0.8)); }
-            100% { transform: scale(1); filter: drop-shadow(0 0 20px rgba(46, 204, 113, 0)); }
-        }
-
-        .correct-anim {
-            animation: correctPulse 0.6s ease-in-out;
-        }
-    </style>
-</head>
-<body>
-
-    <div id="game-container">
-        <h1>chartdle</h1>
-        
-        <div id="chart-wrapper">
-            <canvas id="flagChart"></canvas>
-        </div>
-
-        <div id="input-container">
-            <input type="text" id="guess-input" placeholder="guess the territory..." autocomplete="off">
-        </div>
-
-        <div id="message">loading data...</div>
-    </div>
-
-    <script>
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        
-        function playSound(type) {
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
-
-            if (type === 'correct') {
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(523.25, audioCtx.currentTime); 
-                osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.1); 
-                osc.frequency.setValueAtTime(783.99, audioCtx.currentTime + 0.2); 
-                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
-                osc.start();
-                osc.stop(audioCtx.currentTime + 0.4);
-            } else if (type === 'type') {
-                osc.type = 'triangle';
-                osc.frequency.setValueAtTime(150, audioCtx.currentTime);
-                gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.05);
-                osc.start();
-                osc.stop(audioCtx.currentTime + 0.05);
-            }
-        }
-
-        let countriesData = [];
-        let currentCountry = null;
-        let chartInstance = null;
-
-        const inputEl = document.getElementById('guess-input');
-        const messageEl = document.getElementById('message');
-        const wrapperEl = document.getElementById('chart-wrapper');
-
-        async function initGame() {
-            try {
-                // Fetching via a proxy-friendly endpoint or direct with fallback
-                const res = await fetch('https://restcountries.com/v3.1/all?fields=name,flags,status');
-                if (!res.ok) throw new Error('network response error');
-                const data = await res.json();
-                countriesData = data.filter(c => c.status === 'officially-assigned');
-                nextRound();
-            } catch (err) {
-                console.error(err);
-                messageEl.textContent = "error loading data. trying backup source...";
-                // Fallback attempt with a secondary CDN version of the data if primary fails
-                setTimeout(async () => {
-                    try {
-                        const fallbackRes = await fetch('https://cdn.jsdelivr.net/npm/world-countries-capitals/data/countries.json');
-                        // If both fail, notify user to try hosting on GitHub Pages directly
-                        messageEl.textContent = "please upload to github pages to bypass browser security.";
-                    } catch(e) {
-                        messageEl.textContent = "failed to connect. check connection.";
-                    }
-                }, 2000);
-            }
-        }
-
-        async function nextRound() {
-            inputEl.value = '';
-            messageEl.textContent = '';
+    async function initGame() {
+        messageEl.textContent = "loading data...";
+        try {
+            const res = await fetch('https://restcountries.com/v3.1/all?fields=name,flags,status');
+            if (!res.ok) throw new Error('API temporarily down');
             
-            currentCountry = countriesData[Math.floor(Math.random() * countriesData.length)];
+            const data = await res.json();
             
-            // Generate chart from processed flag image
-            try {
-                const colors = await extractFlagColors(currentCountry.flags.png);
-                renderChart(colors);
-            } catch(e) {
-                // If a specific flag image fails to load via CORS, skip smoothly to next one
-                nextRound();
-            }
+            // Filter for valid territories that actually have a PNG flag attached
+            countriesData = data.filter(c => c.status === 'officially-assigned' && c.flags && c.flags.png);
+            
+            if (countriesData.length === 0) throw new Error('No data parsed');
+            
+            nextRound();
+        } catch (err) {
+            console.error("Fetch error:", err);
+            messageEl.textContent = "api error. please refresh the page.";
         }
+    }
 
-        function extractFlagColors(src) {
-            return new Promise((resolve, reject) => {
-                const img = new Image();
-                img.crossOrigin = "Anonymous"; // Crucial for reading pixels via canvas
-                img.src = src;
-                img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    const ctx = canvas.getContext('2d');
-                    canvas.width = 30; 
-                    canvas.height = 20;
-                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                    
-                    try {
-                        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-                        const colorMap = {};
-
-                        for(let i = 0; i < imgData.length; i += 4) {
-                            if(imgData[i+3] < 128) continue; 
-                            
-                            const r = Math.round(imgData[i] / 25) * 25;
-                            const g = Math.round(imgData[i+1] / 25) * 25;
-                            const b = Math.round(imgData[i+2] / 25) * 25;
-                            const hex = `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
-                            
-                            colorMap[hex] = (colorMap[hex] || 0) + 1;
-                        }
-
-                        const total = Object.values(colorMap).reduce((a, b) => a + b, 0);
-                        const sorted = Object.entries(colorMap)
-                            .map(([color, count]) => ({ color, pct: (count / total) * 100 }))
-                            .filter(c => c.pct > 3); 
-
-                        resolve(sorted);
-                    } catch(e) {
-                        reject(e);
-                    }
-                };
-                img.onerror = (e) => reject(e);
-            });
+    async function nextRound() {
+        inputEl.value = '';
+        messageEl.textContent = '';
+        
+        currentCountry = countriesData[Math.floor(Math.random() * countriesData.length)];
+        
+        try {
+            const colors = await extractFlagColors(currentCountry.flags.png);
+            renderChart(colors);
+        } catch(e) {
+            console.error("Flag parsing failed, skipping to next:", e);
+            // If one specific flag's CORS fails, just smoothly skip to the next one
+            nextRound();
         }
+    }
 
-        function renderChart(colorData) {
-            if (chartInstance) chartInstance.destroy();
-
-            const ctx = document.getElementById('flagChart').getContext('2d');
-            chartInstance = new Chart(ctx, {
-                type: 'pie',
-                data: {
-                    datasets: [{
-                        data: colorData.map(c => c.pct),
-                        backgroundColor: colorData.map(c => c.color),
-                        borderWidth: 0
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { tooltip: { enabled: false }, legend: { display: false } },
-                    animation: { duration: 1000, easing: 'easeOutQuart' }
-                }
-            });
-        }
-
-        inputEl.addEventListener('input', (e) => {
-            if(audioCtx.state === 'suspended') audioCtx.resume();
-            playSound('type');
-
-            const guess = e.target.value.trim().toLowerCase();
-            const commonName = currentCountry.name.common.toLowerCase();
-            const officialName = currentCountry.name.official.toLowerCase();
-
-            if (guess === commonName || guess === officialName) {
-                playSound('correct');
-                messageEl.textContent = `correct! it's ${currentCountry.name.common}.`;
-                wrapperEl.classList.add('correct-anim');
+    function extractFlagColors(src) {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.crossOrigin = "anonymous"; 
+            
+            // Add a cache-buster to prevent the browser from blocking old non-CORS cached images
+            img.src = src + "?not-from-cache-please"; 
+            
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                canvas.width = 30; 
+                canvas.height = 20;
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
                 
-                setTimeout(() => {
-                    wrapperEl.classList.remove('correct-anim');
-                    nextRound();
-                }, 1200);
+                try {
+                    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+                    const colorMap = {};
+
+                    for(let i = 0; i < imgData.length; i += 4) {
+                        if(imgData[i+3] < 128) continue; 
+                        
+                        const r = Math.round(imgData[i] / 25) * 25;
+                        const g = Math.round(imgData[i+1] / 25) * 25;
+                        const b = Math.round(imgData[i+2] / 25) * 25;
+                        const hex = `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
+                        
+                        colorMap[hex] = (colorMap[hex] || 0) + 1;
+                    }
+
+                    const total = Object.values(colorMap).reduce((a, b) => a + b, 0);
+                    const sorted = Object.entries(colorMap)
+                        .map(([color, count]) => ({ color, pct: (count / total) * 100 }))
+                        .filter(c => c.pct > 3); 
+
+                    resolve(sorted);
+                } catch(e) {
+                    reject(e);
+                }
+            };
+            img.onerror = (e) => reject(e);
+        });
+    }
+
+    function renderChart(colorData) {
+        if (chartInstance) chartInstance.destroy();
+
+        const ctx = document.getElementById('flagChart').getContext('2d');
+        chartInstance = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                datasets: [{
+                    data: colorData.map(c => c.pct),
+                    backgroundColor: colorData.map(c => c.color),
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { tooltip: { enabled: false }, legend: { display: false } },
+                animation: { duration: 1000, easing: 'easeOutQuart' }
             }
         });
+    }
 
-        initGame();
-    </script>
-</body>
-</html>
+    inputEl.addEventListener('input', (e) => {
+        if(audioCtx.state === 'suspended') audioCtx.resume();
+        playSound('type');
+
+        const guess = e.target.value.trim().toLowerCase();
+        const commonName = currentCountry.name.common.toLowerCase();
+        const officialName = currentCountry.name.official.toLowerCase();
+
+        if (guess === commonName || guess === officialName) {
+            playSound('correct');
+            messageEl.textContent = `correct! it's ${currentCountry.name.common}.`;
+            wrapperEl.classList.add('correct-anim');
+            
+            setTimeout(() => {
+                wrapperEl.classList.remove('correct-anim');
+                nextRound();
+            }, 1200);
+        }
+    });
+
+    initGame();
+</script>
