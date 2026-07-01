@@ -17,8 +17,16 @@
         }
 
         body {
-            background: #121212;
-            color: #aeaeae;
+            /* detailed moving diagonal checker background */
+            background-color: #111111;
+            background-image: 
+                linear-gradient(45deg, #151515 25%, transparent 25%, transparent 75%, #151515 75%, #151515),
+                linear-gradient(45deg, #151515 25%, #111111 25%, #111111 75%, #151515 75%, #151515);
+            background-size: 60px 60px;
+            background-position: 0 0, 30px 30px;
+            animation: moveBg 12s linear infinite;
+            
+            color: #8e8e8e;
             text-transform: lowercase;
             display: flex;
             flex-direction: column;
@@ -28,54 +36,58 @@
             overflow: hidden;
         }
 
+        /* upscaled game container dimensions */
         #game-container {
             display: flex;
             flex-direction: column;
             align-items: center;
-            max-width: 360px;
+            max-width: 440px; 
             width: 90%;
             text-align: center;
             animation: fadeIn 0.4s ease-out;
+            background: #111111;
+            padding: 30px;
+            border-radius: 8px;
+            border: 1px solid #1a1a1a;
         }
 
         h1 {
             font-weight: 400;
-            font-size: 1.5rem;
+            font-size: 1.8rem;
             letter-spacing: 0.5px;
-            margin-bottom: 2rem;
+            margin-bottom: 2.5rem;
             color: #ffffff;
         }
 
+        /* enlarged pie chart display */
         #chart-wrapper {
             position: relative;
-            width: 200px;
-            height: 200px;
-            margin-bottom: 1.5rem;
+            width: 260px;
+            height: 260px;
+            margin-bottom: 2rem;
         }
 
-        /* simple flat list for percentages */
         #color-legend {
             display: flex;
             flex-wrap: wrap;
             justify-content: center;
-            gap: 12px;
-            margin-bottom: 2.5rem;
+            gap: 16px;
+            margin-bottom: 3rem;
             width: 100%;
         }
 
         .legend-item {
             display: flex;
             align-items: center;
-            font-size: 0.85rem;
-            color: #888888;
-            font-weight: 400;
+            font-size: 0.95rem;
+            color: #777777;
         }
 
         .color-dot {
-            width: 10px;
-            height: 10px;
+            width: 12px;
+            height: 12px;
             border-radius: 2px;
-            margin-right: 6px;
+            margin-right: 8px;
             display: inline-block;
         }
 
@@ -85,30 +97,62 @@
 
         input[type="text"] {
             width: 100%;
-            padding: 10px 0;
+            padding: 12px 0;
             background: transparent;
             border: none;
-            border-bottom: 1px solid #333333;
+            border-bottom: 1px solid #262626;
             color: #ffffff;
-            font-size: 1rem;
+            font-size: 1.1rem;
             outline: none;
             text-align: center;
             transition: border-color 0.2s ease;
         }
 
         input[type="text"]:focus {
-            border-color: #666666;
+            border-color: #444444;
         }
 
         input[type="text"]::placeholder {
-            color: #444444;
+            color: #333333;
+        }
+
+        /* simple navigation and utility dashboard */
+        #button-container {
+            display: flex;
+            gap: 12px;
+            margin-top: 1.5rem;
+            width: 100%;
+        }
+
+        button {
+            flex: 1;
+            background: transparent;
+            border: 1px solid #222222;
+            color: #555555;
+            padding: 10px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            text-transform: lowercase;
+            border-radius: 4px;
+            transition: all 0.2s ease;
+        }
+
+        button:hover {
+            border-color: #333333;
+            color: #888888;
         }
 
         #message {
             margin-top: 1.5rem;
-            font-size: 0.85rem;
+            font-size: 0.95rem;
             height: 20px;
-            color: #888888;
+            color: #666666;
+        }
+
+        @keyframes moveBg {
+            to {
+                background-position: 60px 60px, 90px 90px;
+            }
         }
 
         @keyframes fadeIn {
@@ -116,10 +160,9 @@
             to { opacity: 1; }
         }
 
-        /* simple flat scaling animation for correct guesses */
         @keyframes correctBounce {
             0% { transform: scale(1); }
-            50% { transform: scale(1.03); }
+            50% { transform: scale(1.02); }
             100% { transform: scale(1); }
         }
 
@@ -143,6 +186,11 @@
             <input type="text" id="guess-input" placeholder="type country..." autocomplete="off">
         </div>
 
+        <div id="button-container">
+            <button id="giveup-btn">give up</button>
+            <button id="next-btn">go next</button>
+        </div>
+
         <div id="message"></div>
     </div>
 
@@ -151,6 +199,7 @@
     <script>
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         
+        // muffled, dull audio configurations
         function playSound(type) {
             const osc = audioCtx.createOscillator();
             const gain = audioCtx.createGain();
@@ -158,31 +207,36 @@
             gain.connect(audioCtx.destination);
 
             if (type === 'correct') {
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(523.25, audioCtx.currentTime); 
-                osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.08); 
-                gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+                osc.type = 'sine'; // pure sine waves are inherently duller
+                // low-register warm intervals instead of crisp chords
+                osc.frequency.setValueAtTime(220.00, audioCtx.currentTime); // a3
+                osc.frequency.setValueAtTime(261.63, audioCtx.currentTime + 0.08); // c4
+                gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.35);
                 osc.start();
-                osc.stop(audioCtx.currentTime + 0.3);
+                osc.stop(audioCtx.currentTime + 0.35);
             } else if (type === 'type') {
-                osc.type = 'triangle';
-                osc.frequency.setValueAtTime(100, audioCtx.currentTime);
-                gain.gain.setValueAtTime(0.02, audioCtx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.02);
+                osc.type = 'sine';
+                // sub-bass structural frequencies for a dull acoustic thud
+                osc.frequency.setValueAtTime(75, audioCtx.currentTime);
+                gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.03);
                 osc.start();
-                osc.stop(audioCtx.currentTime + 0.02);
+                osc.stop(audioCtx.currentTime + 0.03);
             }
         }
 
         let currentCountry = null;
         let chartInstance = null;
         let lastSelectedIndex = -1;
+        let revealed = false;
 
         const inputEl = document.getElementById('guess-input');
         const messageEl = document.getElementById('message');
         const wrapperEl = document.getElementById('game-container');
         const legendEl = document.getElementById('color-legend');
+        const giveUpBtn = document.getElementById('giveup-btn');
+        const nextBtn = document.getElementById('next-btn');
 
         function initGame() {
             if (typeof flagData === 'undefined' || flagData.length === 0) {
@@ -196,6 +250,9 @@
             inputEl.value = '';
             messageEl.textContent = '';
             legendEl.innerHTML = '';
+            revealed = false;
+            inputEl.disabled = false;
+            inputEl.focus();
             
             let randomIndex;
             do {
@@ -231,14 +288,11 @@
             });
         }
 
-        // build the flat text legend with percentages next to colors
         function renderLegend(colorData) {
             legendEl.innerHTML = '';
             colorData.forEach(c => {
                 const item = document.createElement('div');
                 item.className = 'legend-item';
-                
-                // clear presentation formatting: format down to 1 decimal place max
                 const displayPct = Number(c.pct).toFixed(1).replace('.0', '');
                 
                 item.innerHTML = `
@@ -249,13 +303,17 @@
             });
         }
 
+        // validation matching engine
         inputEl.addEventListener('input', (e) => {
-            if(audioCtx.state === 'suspended') audioCtx.resume();
+            if (revealed) return;
+            if (audioCtx.state === 'suspended') audioCtx.resume();
             playSound('type');
 
             const guess = e.target.value.trim().toLowerCase();
 
             if (guess === currentCountry.name.toLowerCase()) {
+                revealed = true;
+                inputEl.disabled = true;
                 playSound('correct');
                 messageEl.textContent = `correct: ${currentCountry.name}`;
                 wrapperEl.classList.add('correct-anim');
@@ -263,8 +321,23 @@
                 setTimeout(() => {
                     wrapperEl.classList.remove('correct-anim');
                     nextRound();
-                }, 1000);
+                }, 1200);
             }
+        });
+
+        // utility button operational loops
+        giveUpBtn.addEventListener('click', () => {
+            if (revealed) return;
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            revealed = true;
+            inputEl.disabled = true;
+            inputEl.value = currentCountry.name;
+            messageEl.textContent = `it was ${currentCountry.name}`;
+        });
+
+        nextBtn.addEventListener('click', () => {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            nextRound();
         });
 
         initGame();
