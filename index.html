@@ -17,8 +17,8 @@
         }
 
         body {
-            background: #0b0c10;
-            color: #c5c6c7;
+            background: #121212;
+            color: #aeaeae;
             text-transform: lowercase;
             display: flex;
             flex-direction: column;
@@ -32,78 +32,99 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            max-width: 400px;
+            max-width: 360px;
             width: 90%;
             text-align: center;
-            animation: fadeIn 0.8s ease-out;
+            animation: fadeIn 0.4s ease-out;
         }
 
         h1 {
-            font-weight: 300;
-            letter-spacing: -1px;
+            font-weight: 400;
+            font-size: 1.5rem;
+            letter-spacing: 0.5px;
             margin-bottom: 2rem;
-            color: #66fcf1;
-            text-shadow: 0 0 10px rgba(102, 252, 241, 0.3);
+            color: #ffffff;
         }
 
         #chart-wrapper {
             position: relative;
-            width: 250px;
-            height: 250px;
-            margin-bottom: 2.5rem;
-            transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.05));
+            width: 200px;
+            height: 200px;
+            margin-bottom: 1.5rem;
         }
 
-        #chart-wrapper:hover {
-            transform: scale(1.03);
+        /* simple flat list for percentages */
+        #color-legend {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 2.5rem;
+            width: 100%;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            font-size: 0.85rem;
+            color: #888888;
+            font-weight: 400;
+        }
+
+        .color-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 2px;
+            margin-right: 6px;
+            display: inline-block;
         }
 
         #input-container {
             width: 100%;
-            position: relative;
         }
 
         input[type="text"] {
             width: 100%;
-            padding: 12px 20px;
-            background: #1f2833;
-            border: 1px solid #45f3ff33;
-            border-radius: 30px;
-            color: #fff;
+            padding: 10px 0;
+            background: transparent;
+            border: none;
+            border-bottom: 1px solid #333333;
+            color: #ffffff;
             font-size: 1rem;
             outline: none;
             text-align: center;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            transition: border-color 0.2s ease;
         }
 
         input[type="text"]:focus {
-            border-color: #66fcf1;
-            box-shadow: 0 0 15px rgba(102, 252, 241, 0.3);
+            border-color: #666666;
+        }
+
+        input[type="text"]::placeholder {
+            color: #444444;
         }
 
         #message {
             margin-top: 1.5rem;
-            font-size: 0.9rem;
+            font-size: 0.85rem;
             height: 20px;
-            color: #45f3ff;
-            letter-spacing: 0.5px;
+            color: #888888;
         }
 
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
+            from { opacity: 0; }
+            to { opacity: 1; }
         }
 
-        @keyframes correctPulse {
-            0% { transform: scale(1); filter: drop-shadow(0 0 20px rgba(102, 252, 241, 0.6)); }
-            50% { transform: scale(1.06); filter: drop-shadow(0 0 35px rgba(102, 252, 241, 0.8)); }
-            100% { transform: scale(1); filter: drop-shadow(0 0 20px rgba(102, 252, 241, 0)); }
+        /* simple flat scaling animation for correct guesses */
+        @keyframes correctBounce {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.03); }
+            100% { transform: scale(1); }
         }
 
         .correct-anim {
-            animation: correctPulse 0.6s ease-in-out;
+            animation: correctBounce 0.4s ease-in-out;
         }
     </style>
 </head>
@@ -116,8 +137,10 @@
             <canvas id="flagChart"></canvas>
         </div>
 
+        <div id="color-legend"></div>
+
         <div id="input-container">
-            <input type="text" id="guess-input" placeholder="guess the territory..." autocomplete="off">
+            <input type="text" id="guess-input" placeholder="type country..." autocomplete="off">
         </div>
 
         <div id="message"></div>
@@ -126,7 +149,6 @@
     <script src="flags.js"></script>
 
     <script>
-        // javascript built-in web audio synth engine
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         
         function playSound(type) {
@@ -137,22 +159,19 @@
 
             if (type === 'correct') {
                 osc.type = 'sine';
-                // chord pattern for successful guess
-                osc.frequency.setValueAtTime(523.25, audioCtx.currentTime); // c5
-                osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.08); // e5
-                osc.frequency.setValueAtTime(783.99, audioCtx.currentTime + 0.16); // g5
-                gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+                osc.frequency.setValueAtTime(523.25, audioCtx.currentTime); 
+                osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.08); 
+                gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
                 osc.start();
-                osc.stop(audioCtx.currentTime + 0.4);
+                osc.stop(audioCtx.currentTime + 0.3);
             } else if (type === 'type') {
                 osc.type = 'triangle';
-                // quick high-frequency pop for typewriter feeling
-                osc.frequency.setValueAtTime(120, audioCtx.currentTime);
-                gain.gain.setValueAtTime(0.03, audioCtx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.03);
+                osc.frequency.setValueAtTime(100, audioCtx.currentTime);
+                gain.gain.setValueAtTime(0.02, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.02);
                 osc.start();
-                osc.stop(audioCtx.currentTime + 0.03);
+                osc.stop(audioCtx.currentTime + 0.02);
             }
         }
 
@@ -162,11 +181,12 @@
 
         const inputEl = document.getElementById('guess-input');
         const messageEl = document.getElementById('message');
-        const wrapperEl = document.getElementById('chart-wrapper');
+        const wrapperEl = document.getElementById('game-container');
+        const legendEl = document.getElementById('color-legend');
 
         function initGame() {
             if (typeof flagData === 'undefined' || flagData.length === 0) {
-                messageEl.textContent = "error: flags.js file missing or empty.";
+                messageEl.textContent = "error: flags.js missing.";
                 return;
             }
             nextRound();
@@ -175,8 +195,8 @@
         function nextRound() {
             inputEl.value = '';
             messageEl.textContent = '';
+            legendEl.innerHTML = '';
             
-            // avoid picking the exact same territory back-to-back
             let randomIndex;
             do {
                 randomIndex = Math.floor(Math.random() * flagData.length);
@@ -186,6 +206,7 @@
             currentCountry = flagData[randomIndex];
             
             renderChart(currentCountry.colors);
+            renderLegend(currentCountry.colors);
         }
 
         function renderChart(colorData) {
@@ -205,12 +226,29 @@
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: { tooltip: { enabled: false }, legend: { display: false } },
-                    animation: { duration: 900, easing: 'easeOutQuint' }
+                    animation: { duration: 400, easing: 'easeOutCubic' }
                 }
             });
         }
 
-        // input verification matching loop
+        // build the flat text legend with percentages next to colors
+        function renderLegend(colorData) {
+            legendEl.innerHTML = '';
+            colorData.forEach(c => {
+                const item = document.createElement('div');
+                item.className = 'legend-item';
+                
+                // clear presentation formatting: format down to 1 decimal place max
+                const displayPct = Number(c.pct).toFixed(1).replace('.0', '');
+                
+                item.innerHTML = `
+                    <span class="color-dot" style="background: ${c.hex}"></span>
+                    ${displayPct}%
+                `;
+                legendEl.appendChild(item);
+            });
+        }
+
         inputEl.addEventListener('input', (e) => {
             if(audioCtx.state === 'suspended') audioCtx.resume();
             playSound('type');
@@ -219,18 +257,16 @@
 
             if (guess === currentCountry.name.toLowerCase()) {
                 playSound('correct');
-                messageEl.textContent = `correct! it's ${currentCountry.name}.`;
+                messageEl.textContent = `correct: ${currentCountry.name}`;
                 wrapperEl.classList.add('correct-anim');
                 
-                // smooth transition into infinite continuous play
                 setTimeout(() => {
                     wrapperEl.classList.remove('correct-anim');
                     nextRound();
-                }, 1200);
+                }, 1000);
             }
         });
 
-        // boot up
         initGame();
     </script>
 </body>
